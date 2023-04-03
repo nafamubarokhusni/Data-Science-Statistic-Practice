@@ -1,0 +1,335 @@
+---
+title: "Praktikum SSD 4"
+author: "Husni Na'fa Mubarok"
+date: "2023-03-31"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Linear Model Selection
+
+Nama : Husni Na'fa Mubarok
+
+NIM : 121450078
+
+Kelas : RA
+
+Import Package :
+
+```{r}
+library(MASS)
+library(ISLR)
+library(skimr)
+```
+
+## Import Data
+
+```{r}
+head(Boston)
+```
+
+```{r}
+show(Boston)
+```
+
+```{r}
+dim(Boston)
+```
+
+```{r}
+sum(is.na(Boston))
+```
+
+```{r}
+skim_without_charts(Boston)
+```
+
+```{r}
+library(leaps)
+regfit.full = regsubsets(crim~., Boston)
+summary(regfit.full)
+```
+
+```{r}
+regfit.full=regsubsets(crim~., data = Boston, nvmax = 13)
+reg.summary=summary(regfit.full)
+```
+
+```{r}
+names(reg.summary)
+```
+
+```{r}
+reg.summary$rsq
+```
+
+```{r}
+par(mfrow=c(2,2))
+plot(reg.summary$rss, xlab = "Jumlah Variabel", ylab = "RSS", type = "line")
+plot(reg.summary$adjr2, xlab = "Jumlah Variabel", ylab = "Adjusted R^2", type = "line")
+```
+
+```{r}
+which.max(reg.summary$adjr2)
+```
+
+```{r}
+plot(reg.summary$adjr2, xlab = "Jumlah Variabel", ylab = "Adjusted R^2", type = "line")
+points(9,reg.summary$adjr2[9], col="red", cex=2, pch=20)
+```
+
+```{r}
+plot(reg.summary$cp, xlab = "Jumlah Variabel", ylab = "Cp", type = "line")
+```
+
+```{r}
+which.min(reg.summary$cp)
+```
+
+```{r}
+plot(reg.summary$cp, xlab = "Jumlah Variabel", ylab = "Cp", type = "line")
+points(8,reg.summary$cp[8], col="red", cex=2, pch=20)
+```
+
+```{r}
+plot(regfit.full, scale='r2')
+```
+
+```{r}
+plot(regfit.full, scale='adjr2')
+```
+
+```{r}
+plot(regfit.full, scale='Cp')
+```
+
+```{r}
+plot(regfit.full, scale='bic')
+```
+
+```{r}
+coef(regfit.full,13)
+```
+
+```{r}
+regfit.fwd=regsubsets(crim~., data = Boston, nvmax = 13, method = "forward")
+summary(regfit.fwd)
+```
+
+```{r}
+regfit.bwd=regsubsets(crim~., data = Boston, nvmax = 13, method = "backward")
+summary(regfit.bwd)
+```
+
+```{r}
+coef(regfit.full,13)
+```
+
+```{r}
+coef(regfit.fwd,13)
+```
+
+```{r}
+coef(regfit.bwd,13)
+```
+
+```{r}
+set.seed(1)
+train = sample(c(TRUE,FALSE), nrow(Boston), rep = TRUE)
+test = (!train)
+```
+
+```{r}
+regfit.best = regsubsets(crim~., data = Boston[train,], nvmax = 13)
+```
+
+```{r}
+test.mat = model.matrix(crim~., data = Boston[test,])
+```
+
+```{r}
+val.errors = rep(NA,13)
+for(i in 1:13){
+  coefi = coef(regfit.best,id=i)
+  pred = test.mat[,names(coefi)]%*%coefi
+  val.errors[i]=mean((Boston$crim[test]-pred)^2)
+}
+```
+
+```{r}
+val.errors
+```
+
+```{r}
+which.min(val.errors)
+```
+
+```{r}
+coef(regfit.best,13)
+```
+
+```{r}
+predict.regsubsets=function(object,newdata,id){
+  form = as.formula(object$call[[2]])
+  mat = model.matrix(form,newdata)
+  coefi = coef(object,id=id)
+  xvars = names(coefi)
+  mat[,xvars]%*%coefi
+}
+```
+
+```{r}
+regfit.best = regsubsets(crim~., data = Boston, nvmax = 13)
+coef(regfit.best,10)
+```
+
+```{r}
+k=10
+set.seed(1)
+folds = sample(1:k,nrow(Boston),replace = TRUE)
+cv.errors = matrix(NA,k,13, dimnames = list(NULL,paste(1:13)))
+```
+
+```{r}
+for (j in 1:k) {
+  best.fit = regsubsets(crim~., data = Boston[folds!=j,], nvmax = 13)
+  for (i in 1:13) {
+    pred = predict(best.fit,Boston[folds==j,],id=i)
+    cv.errors[j,i]=mean((Boston$crim[folds==j]-pred)^2)
+  }
+}
+```
+
+```{r}
+mean.cv.errors=apply(cv.errors,2,mean)
+mean.cv.errors
+```
+
+```{r}
+par(mfrow=c(1,1))
+plot(mean.cv.errors,type = 'b')
+```
+
+```{r}
+reg.best = regsubsets(crim~.,data = Boston, nvmax = 13)
+coef(reg.best,10)
+```
+
+```{r}
+x = model.matrix(crim~., Boston)[,-1]
+y = Boston$crim
+```
+
+```{r}
+library(glmnet)
+```
+
+```{r}
+grid = 10^seq(10,-2,length=100)
+ridge.mod = glmnet(x,y,alpha = 0,lambda = grid)
+```
+
+```{r}
+dim(coef(ridge.mod))
+```
+
+```{r}
+ridge.mod$lambda[50]
+```
+
+```{r}
+coef(ridge.mod)[,50]
+```
+
+```{r}
+sqrt(sum(coef(ridge.mod)[-1,50]^2))
+```
+
+```{r}
+ridge.mod$lambda[60]
+```
+
+```{r}
+coef(ridge.mod)[,60]
+```
+
+```{r}
+sqrt(sum(coef(ridge.mod)[-1,60]^2))
+```
+
+```{r}
+predict(ridge.mod,s=50,type = "coefficients")[1:14,]
+```
+
+```{r}
+set.seed(1)
+train = sample(1:nrow(x),nrow(x)/2)
+test = (-train)
+y.test = y[test]
+```
+
+```{r}
+ridge.mod=glmnet(x[train,],y[train], alpha = 0, lambda = grid, thresh = 1e-12)
+ridge.pred=predict(ridge.mod,s = 4, newx = x[test,])
+mean((ridge.pred-y.test)^2)
+```
+
+```{r}
+mean((mean(y[train])-y.test)^2)
+```
+
+```{r}
+ridge.pred=predict(ridge.mod, s=1e10, newx = x[test,])
+mean((ridge.pred-y.test)^2)
+```
+
+```{r}
+set.seed(1)
+cv.out = cv.glmnet(x[train,],y[train],alpha=0)
+plot(cv.out)
+```
+
+```{r}
+bestlam = cv.out$lambda.min
+bestlam
+```
+
+```{r}
+ridge.pred = predict(ridge.mod , s=bestlam, newx = x[test,])
+mean((ridge.pred-y.test)^2)
+```
+
+```{r}
+out = glmnet(x,y,alpha = 0)
+predict(out, type = "coefficients", s=bestlam)[1:14,]
+```
+
+```{r}
+lasso.mod = glmnet(x[train,],y[train],alpha = 1, lambda=grid)
+plot(lasso.mod)
+```
+
+```{r}
+set.seed(1)
+cv.out = cv.glmnet(x[train,],y[train], alpha = 1)
+plot(cv.out)
+```
+
+```{r}
+bestlam = cv.out$lambda.min
+lasso.pred = predict(lasso.mod, s=bestlam, newx = x[test,])
+mean((lasso.pred-y.test)^2)
+```
+
+```{r}
+bestlam
+```
+
+```{r}
+out = glmnet(x,y,alpha = 1, lambda = grid)
+lasso.coef=predict(out,type = "coefficients",s = bestlam)[1:14,]
+lasso.coef
+```
